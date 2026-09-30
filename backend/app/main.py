@@ -1,4 +1,3 @@
-```python
 import asyncio
 import os
 from datetime import datetime, timezone, timedelta
@@ -889,4 +888,3 @@ async def simulate():
         "count":
             len(results)
     }
-```
