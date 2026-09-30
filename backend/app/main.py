@@ -1,4 +1,6 @@
+```python
 import asyncio
+import os
 from datetime import datetime, timezone, timedelta
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -42,14 +44,31 @@ app = FastAPI(
 # CORS
 # ============================================================
 
+# Production Vercel URL is supplied through Render
+# environment variable:
+#
+# FRONTEND_URL=https://your-frontend.vercel.app
+#
+# Local development URLs are retained.
+
+frontend_url = os.getenv(
+    "FRONTEND_URL",
+    ""
+).strip().rstrip("/")
+
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+]
+
+if frontend_url:
+    allowed_origins.append(frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174"
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -422,19 +441,6 @@ def process_security_event(event: dict):
 
     # --------------------------------------------------------
     # MONITORING ATTACK TYPE
-    #
-    # Project 2 has six simulation types:
-    #
-    # Port Scan
-    # Brute Force
-    # Traffic Anomaly
-    # IOC Detection
-    # Authentication Abuse
-    # DoS
-    #
-    # Preserve the original Project 2 event_type.
-    #
-    # ML classification remains independent.
     # --------------------------------------------------------
 
     if original_event_type in [
@@ -475,23 +481,18 @@ def process_security_event(event: dict):
 
         **flow,
 
-        # Original Project 2 event
         "event_type":
             original_event_type,
 
-        # Monitoring classification
         "attack_type":
             attack_type,
 
-        # Actual ML prediction
         "ml_attack_type":
             ml_attack_type,
 
-        # ML confidence
         "confidence":
             ml_confidence,
 
-        # Prevention
         "action":
             prevention_result[
                 "action"
@@ -502,14 +503,12 @@ def process_security_event(event: dict):
                 "status"
             ],
 
-        # Timestamp
         "timestamp":
             event.get(
                 "timestamp"
             )
             or get_ist_time().isoformat(),
 
-        # Preserve simulation type
         "simulation_attack_type":
             event.get(
                 "simulation_attack_type"
@@ -570,14 +569,11 @@ async def predict(
 
     event = flow.model_dump()
 
-    # Run blocking ML/database/Groq work
-    # outside the FastAPI event loop.
     result = await asyncio.to_thread(
         process_security_event,
         event
     )
 
-    # Immediately broadcast processed event.
     await manager.broadcast({
 
         "type":
@@ -605,10 +601,6 @@ async def receive_security_event(
 
     incoming = event.model_dump()
 
-    # --------------------------------------------------------
-    # Preserve Project 2 metadata
-    # --------------------------------------------------------
-
     incoming[
         "simulation"
     ] = True
@@ -623,24 +615,10 @@ async def receive_security_event(
         "AI-IDAPS-Attack-Simulation-Console"
     )
 
-    # --------------------------------------------------------
-    # PROCESS EVENT
-    #
-    # process_security_event contains blocking
-    # Groq/database work.
-    #
-    # Run it in a worker thread so that the
-    # FastAPI event loop remains responsive.
-    # --------------------------------------------------------
-
     result = await asyncio.to_thread(
         process_security_event,
         incoming
     )
-
-    # --------------------------------------------------------
-    # REAL-TIME BROADCAST
-    # --------------------------------------------------------
 
     await manager.broadcast({
 
@@ -659,10 +637,6 @@ async def receive_security_event(
         f"Type: {result.get('event_type')} | "
         f"Source: {result.get('source_ip')}"
     )
-
-    # --------------------------------------------------------
-    # AUTHORITATIVE RESPONSE
-    # --------------------------------------------------------
 
     return {
 
@@ -698,7 +672,6 @@ async def websocket_endpoint(
                 await websocket.receive_text()
             )
 
-            # Optional heartbeat
             if message == "ping":
 
                 await websocket.send_json({
@@ -887,8 +860,6 @@ async def simulate():
 
     for flow in synthetic_flows:
 
-        # Run blocking processing outside
-        # the FastAPI event loop.
         result = await asyncio.to_thread(
             process_security_event,
             flow
@@ -898,7 +869,6 @@ async def simulate():
             result
         )
 
-        # Real-time broadcast
         await manager.broadcast({
 
             "type":
@@ -919,3 +889,4 @@ async def simulate():
         "count":
             len(results)
     }
+```
