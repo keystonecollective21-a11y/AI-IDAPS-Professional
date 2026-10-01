@@ -13,4 +13,4 @@ frontend/node_modules/
 *.sqlite3
 
 .vscode/
-.idea/
+.idea/frontend/dist/
